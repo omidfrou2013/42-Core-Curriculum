@@ -35,4 +35,10 @@ char *find_full_path(char **s_paths, char **c_parts, int p_index)
     return (c_parts[0]);
 }
 
-char *const
+char *construct_full_path(char *env_paths, char **c_paths)
+{
+    char *s_paths;
+    char *f_paths;
+    int path_index;
+
+    path_index = 0;
