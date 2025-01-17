@@ -12,33 +12,67 @@
 
 #include "pipex.h"
 
-char **split_env_paths(char*env_paths)
+void    error_exit(char *message)
 {
-    return(ft_split(env_paths, ':'));
+    perror(message);
+    exit(EXIT_FAILURE);
 }
 
-char *find_full_path(char **s_paths, char **c_parts, int p_index)
+void    child_process(char **argv, int *pipe_fd, int infile, char **envp)
 {
-    char *full_path;
-    char *tmp;
+    dup2(infile, STDIN_FILENO);
+    dup2(pipe_fd[1], STDOUT_FILENO);
+    close(infile);
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
+    ft_run(argv[2], envp);
+}
+void    parent_process(char **argv, int *pipe_fd, int outfile, char **envp)
+{
+    pid_t   pid2;
+    int     sta1;
 
-    while (s_paths[p_index])
+    pid2 = fork();
+    if (pid2 == -1)
+        error_exit("Fork error");
+    if (pid2 == 0)
     {
-        tmp = ft_strjoin(s_paths[p_index], "/");
-        full_path = ft_strjoin(tmp, c_parts[0]);
-        free(tmp);
-        if (access(full_path, F_OK) == 0)
-            return (full_path);
-        free(full_path);
-        p_index++;
+        dup2(pipe_fd[0], STDIN_FILENO);
+        dup2(outfile, STDOUT_FILENO);
+        close(pipe_fd[1]);
+        ft_run(argv[3], envp);
     }
-    return (c_parts[0]);
+    close(pipe_fd[1]);
+    close(outfile);
+    waitpid(pid2, &sta1, 0);
+    if (WIFEXITED(sta1))
+        exit(WEXITSTATUS(sta1));
+    else
+        exit(1);
 }
 
-char *construct_full_path(char *env_paths, char **c_paths)
+int main(int argc, char **argv, char **envp)
 {
-    char *s_paths;
-    char *f_paths;
-    int path_index;
+    int     pipe_fd[2];
+    int     infile;
+    int     outfile;
+    pid_t   pid1;
 
-    path_index = 0;
+    if (argc != 5)
+        return (ft_putendl_fd("Usage: ./pipex infile cmd1 cmd2 outfile", 2), 1);
+    if (pipe(pipe_fd) == -1)
+        error_exit("File/pipe error");
+    pid1 = fork();
+    infile = open(argv[1], O_RDONLY);
+    outfile = open(argv[4], O_RDWR | O_CREAT | O_TRUNC, 0644);
+    if (infile < 0 || outfile < 0 || pid1 == -1)
+        error_exit("file not created");
+    if ((pid1) == 0)
+        child_process(argv, pipe_fd, infile, envp);
+   else
+    {
+        parent_process(argv, pipe_fd, outfile, envp);
+        waitpid(pid1, NULL, 0);
+    }
+    return (0);
+}
